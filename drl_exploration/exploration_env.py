@@ -4,22 +4,30 @@ from gymnasium import spaces
 import numpy as np
 import time
 
-
+from .ROS_interface import ROSInterface
+from .simulation_reset import SimulationReset   
 
 DISTANCE_THRESHOLD = 0.01
 ACTION_PERIOD = 1.0
 KNOWN_MAP_PERCENTAGE_GOAL = 0.75
+MAX_LINEAR_VELOCITY = 0.22
+MAX_ANGULAR_VELOCITY = 2.84
 
 class ExplorationEnv(gym.Env):
-    def __init__(self, ros_interface):
+    def __init__(self, ros_interface: ROSInterface, sim_reset: SimulationReset):
         super(ExplorationEnv, self).__init__()
+
+
         self.ros_int = ros_interface
+        self.sim_reset = sim_reset
 
         self.once = True
         self.reset_finished = False
 
-        self.linear_max = 0.2
-        self.angular_max = 0.5
+        self.linear_max = MAX_LINEAR_VELOCITY
+        self.angular_max = MAX_ANGULAR_VELOCITY
+        self._init_action_space()
+        self._init_observation_space()
 
 
     def _init_action_space(self):
@@ -46,28 +54,44 @@ class ExplorationEnv(gym.Env):
                 self.ros_int.get_tf_map2odom() is None or \
                 self.ros_int.get_gazebo_clock_msg() is None:
 
-            if self.ros_int.get_scan_msg() is None:
-                self.ros_int.get_logger().info("[Exploration_env] Waiting for scan messages...")
-            if self.ros_int.get_map_msg() is None:
-                self.ros_int.get_logger().info("[Exploration_env] Waiting for map messages...")
-            if self.ros_int.get_tf_odom2foot() is None:
-                self.ros_int.get_logger().info("[Exploration_env] Waiting for tf odom2foot messages...")
-            if self.ros_int.get_tf_map2odom() is None:
-                self.ros_int.get_logger().info("[Exploration_env] Waiting for tf map2odom messages...")
-            if self.ros_int.get_gazebo_clock_msg() is None:
-                self.ros_int.get_logger().info("[Exploration_env] Waiting for gazebo clock messages...")
+            # if self.ros_int.get_scan_msg() is None:
+            #     self.ros_int.get_logger().info("[Exploration_env] Waiting for scan messages...")
+            # if self.ros_int.get_map_msg() is None:
+            #     self.ros_int.get_logger().info("[Exploration_env] Waiting for map messages...")
+            # if self.ros_int.get_tf_odom2foot() is None:
+            #     self.ros_int.get_logger().info("[Exploration_env] Waiting for tf odom2foot messages...")
+            # if self.ros_int.get_tf_map2odom() is None:
+            #     self.ros_int.get_logger().info("[Exploration_env] Waiting for tf map2odom messages...")
+            # if self.ros_int.get_gazebo_clock_msg() is None:
+            #     self.ros_int.get_logger().info("[Exploration_env] Waiting for gazebo clock messages...")
 
             time.sleep(0.2)
             pass
+
+    def correct_obs_size(self, array, name):
+        if name == "cell_values":
+            expected_shape = self.observation_space["cell_values"].shape
+        elif name == "cell_positions":
+            expected_shape = self.observation_space["cell_positions"].shape
+        
+        if array.shape[0] > expected_shape[0]:
+            return array[:expected_shape[0]]
+        elif array.shape[0] < expected_shape[0]:
+            if len(array.shape) == 1:
+                return np.pad(array, (0, expected_shape[0] - array.shape[0]), 'constant')
+            else:
+                return np.pad(array, ((0, expected_shape[0] - array.shape[0]), (0, 0)), 'constant')
+        else:
+            return array
         
     def _get_obs(self):
         self.wait_for_callbacks()
-        print("get obs")
         scan_msg = self.ros_int.get_scan_msg()
         map_msg = self.ros_int.get_map_msg()
         robot_position = np.array(self.ros_int.get_robot_pos_wrt_map())
         robot_angle = self.ros_int.get_robot_angle()
         cell_positions = np.array(self.ros_int.get_cells_position())
+
 
         ranges = np.array(scan_msg.ranges)
         range_min = scan_msg.range_min
@@ -94,15 +118,20 @@ class ExplorationEnv(gym.Env):
 
         # Clip values between 0 and 1 to make sure they are in the correct range
         obs_scan = np.clip(obs_scan, 0, 1)
-        cell_values = np.clip(cell_values, 0, 1)
         robot_pose = np.clip(robot_pose, 0, 1)
+        cell_values = np.clip(cell_values, 0, 1)
+        cell_values = self.correct_obs_size(cell_values, "cell_values")
         cell_positions = np.clip(cell_positions, 0, 1)
+        cell_positions = self.correct_obs_size(cell_positions, "cell_positions")
 
         return {"scan": obs_scan,
                 "cell_values": cell_values.astype(np.float32),
                 "cell_positions": cell_positions.astype(np.float32),
                 "robot_pose": robot_pose.astype(np.float32),}
-    
+
+    def get_known_map_percentage(self):
+        return self.ros_int.count_known_cells() / len(self.ros_int.get_map_data())
+
     def _get_info(self):
         return {}
 
@@ -111,15 +140,15 @@ class ExplorationEnv(gym.Env):
         return reward - 10.0 if min(observation["scan"]) < DISTANCE_THRESHOLD else reward
 
     def _get_done(self):
-        if self.ros_int.count_known_cells() == KNOWN_MAP_PERCENTAGE_GOAL*len(self.ros_int.get_map_data()):
-            self.ros_int.get_logger().info("[Exploration_env] Map Completed!!")
+        if self.get_known_map_percentage() > KNOWN_MAP_PERCENTAGE_GOAL:
+            # self.ros_int.get_logger().info("[Exploration_env] Map Completed!!")
             return True
         else:
             return False
 
     def _get_truncated(self, observation):
         if min(observation["scan"]) < DISTANCE_THRESHOLD:
-            self.ros_int.get_logger().info("[Exploration_env] Collision detected")
+            # self.ros_int.get_logger().info("[Exploration_env] Collision detected")
             return True
         else:    
             return False
@@ -139,7 +168,7 @@ class ExplorationEnv(gym.Env):
         return [linear, angular]
 
     def step(self, action):
-        self.ros_int.get_logger().info(f"[Exploration_env] New Action: {action}")
+        # self.ros_int.get_logger().info(f"[Exploration_env] New Action: {action}")
         self.ros_int.cmd_vel_publish(self.scaled_action(action))
 
         self.wait_gazebo_time(1.0)
@@ -151,14 +180,12 @@ class ExplorationEnv(gym.Env):
         info = self._get_info()
 
 
-        print("Reward: ", reward)
-        print("ROBOT_POSITION = ", observation["robot_pose"])
         return observation, reward, done, truncated, info
 
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed, options=options)
-        self.ros_int.reset_simulation()
+        self.sim_reset.reset_simulation()
         # while not self.ros_int.reset_done():
         #     pass
         return self._get_obs(), self._get_info()
@@ -171,7 +198,7 @@ class ExplorationEnv(gym.Env):
 
     def test(self):
         if self.once == True:
-            # self.reset()
+            self.reset()
             self.once = False
 
         

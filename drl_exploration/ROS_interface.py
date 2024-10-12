@@ -1,16 +1,7 @@
 
-import rclpy
 from rclpy.node import Node
-from rclpy.executors import SingleThreadedExecutor
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy
-import threading
 import numpy as np
-import subprocess
-import os
-import signal
-import time
-
-from .agent import Agent
 
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist
@@ -20,7 +11,6 @@ from nav_msgs.msg import OccupancyGrid
 from tf2_msgs.msg import TFMessage
 
 
-MODE = "test"
 
 class ROSInterface(Node):
     def __init__(self):
@@ -31,16 +21,13 @@ class ROSInterface(Node):
         self._tf_msg = None
         self._tf_odom2foot = None
         self._tf_map2odom = None
-        self._reset_finished = False
         self._robot_angle = None
         self._robot_position = None
-
         clock_qos_profile = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
             depth=10
         )
 
-        
 
         self.scan_sub = self.create_subscription(LaserScan, '/scan', self.scan_callback, 10)
         self.map_sub = self.create_subscription(OccupancyGrid, '/map', self.map_callback, 10)
@@ -214,109 +201,19 @@ class ROSInterface(Node):
         cmd_vel_msg.angular.z = action[1].astype(float)
         self.cmd_vel_pub.publish(cmd_vel_msg)
 
-    def reset_done(self):
-        return self._reset_finished
-    
     def reset_callback(self, future):
         try:
             response = future.result()
             if response is not None:
-                self.get_logger().info('Simulation reset successfully')
-                self._reset_finished = True
+                self.get_logger().info('World reset successfully')
             else:
-                self.get_logger().error('Failed to reset simulation')
+                self.get_logger().error('Failed to reset World')
         except Exception as e:
             self.get_logger().error(f'Service call failed: {str(e)}')
 
-    # def reset_simulation(self):
-    #     self.get_logger().info('Resetting simulation...')
-    #     # # Call ROS2 service to reset the environment
-    #     self._reset_finished = False
-    #     while not self.world_reset_client.wait_for_service(timeout_sec=1.0):
-    #         self.get_logger().info('service not available, waiting again...')
-    #     future = self.world_reset_client.call_async(Empty.Request())
-    #     future.add_done_callback(self.reset_callback)
+    def reset_world(self):
+        print("Resetting world")
+        future = self.world_reset_client.call_async(Empty.Request())
+        future.add_done_callback(self.reset_callback)
+        return future
 
-    def reset_simulation(self):
- # Launch Cartographer
-        print("Launching Cartographer...")
-        self.cartographer_process = subprocess.Popen(
-            ['ros2', 'launch', 'your_cartographer_launch_file.py'],  # Adjust the path as necessary
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
-        print("STO CREANDOOO")
-        time.sleep(5)  # Allow time for Cartographer to initialize
-        os.kill(self.cartographer_process.pid, signal.SIGTERM)
-        self.cartographer_process.wait()
-        print("KILLATTOOOOOO")
-
-def main():
-    rclpy.init()
-
-
-    from launch import LaunchService
-    from launch.launch_description_sources import PythonLaunchDescriptionSource
-    from ament_index_python.packages import get_package_share_directory
-    from launch.actions import IncludeLaunchDescription
-    import os
-
-    # Create a LaunchService instance
-    launch_service = LaunchService()
-
-    # Define the path to the launch file
-    launch_file_path = os.path.join(
-        get_package_share_directory('turtlebot3_cartographer'),
-        'launch',
-        'cartographer.launch.py'
-    )
-
-    # Include the launch file in the launch service
-    launch_description = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(launch_file_path)
-    )
-
-    # Add the launch description to the launch service
-    launch_service.include_launch_description(launch_description)
-
-    # Run the launch service
-    launch_service.run()
-
-
-
-
-    executor = SingleThreadedExecutor()
-
-    ROS_inter = ROSInterface()
-
-    executor.add_node(ROS_inter)
-    executor_thread = threading.Thread(target=executor.spin, daemon=True)
-    executor_thread.start()
-
-    agent = Agent(ROS_inter)
-    try: 
-        while rclpy.ok():
-            match MODE:
-                case "train":
-                    agent.train()
-                case "eval":
-                    agent.eval()
-                case "test":
-                    agent.test()
-                case "check":
-                    agent.check()
-    except KeyboardInterrupt:
-        pass
-
-    # Cleanup: shutdown executor and ROS2
-    executor.shutdown()
-    rclpy.shutdown()
-
-    # Wait for the executor thread to finish
-    executor_thread.join()
-
-    
-
-
-if __name__ == '__main__': 
-    main()

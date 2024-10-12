@@ -23,7 +23,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'drl_exploration = drl_exploration.ROS_interface:main',
+            'drl_exploration = drl_exploration.main:main',
         ],
     },
 )

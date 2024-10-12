@@ -1,3 +1,5 @@
 /models
-/log
-/resource
+/logs
+bashrc
+Dockerfile
+.sh
