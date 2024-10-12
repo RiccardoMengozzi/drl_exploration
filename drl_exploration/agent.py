@@ -117,7 +117,7 @@ class Agent(Node):
 
         model = PPO("MultiInputPolicy", self.env, verbose=1, 
                     tensorboard_log=self.log_path)
-        callbacks = [wand_cb, CustomLoggingCallback(self.env), SaveModelByEpisodeCallback(save_freq=2000, save_path=f"{self.save_model_path}/{run.name}")]
+        callbacks = [wand_cb, CustomLoggingCallback(self.env), SaveModelByEpisodeCallback(save_freq=10, save_path=f"{self.save_model_path}/{run.name}")]
         try:
             print('start learning')
             model.learn(total_timesteps=N_ITERS, log_interval=1, callback=callbacks, )  

@@ -36,10 +36,12 @@ class SimulationReset:
 
     def launch_ros2_file(self):
         command = "ros2 launch turtlebot3_cartographer cartographer.launch.py use_sim_time:=True"
+        env = os.environ.copy()
+        env["DISPLAY"] = ":0"
 
         try:
             # Start the process
-            process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
 
             # Get the PID of the launched process
             pid = process.pid

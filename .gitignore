@@ -1,5 +1,2 @@
-/models
-/logs
-bashrc
-Dockerfile
-.sh
+/models/*
+/logs/*
