@@ -12,6 +12,8 @@ ACTION_PERIOD = 1.0
 KNOWN_MAP_PERCENTAGE_GOAL = 0.75
 MAX_LINEAR_VELOCITY = 0.22
 MAX_ANGULAR_VELOCITY = 2.84
+MIN_ACTION_TIME = 0.5
+MAX_ACTION_TIME = 10.0
 
 class ExplorationEnv(gym.Env):
     def __init__(self, ros_interface: ROSInterface, sim_reset: SimulationReset):
@@ -22,17 +24,14 @@ class ExplorationEnv(gym.Env):
         self.sim_reset = sim_reset
 
         self.once = True
-        self.reset_finished = False
 
-        self.linear_max = MAX_LINEAR_VELOCITY
-        self.angular_max = MAX_ANGULAR_VELOCITY
         self._init_action_space()
         self._init_observation_space()
 
 
     def _init_action_space(self):
-        # linear velocity along x, angular velocity along z
-        self.action_space = spaces.Box(low=-1, high=1, shape=(2,), dtype=np.float32)
+        # linear velocity along x, angular velocity along z, time to perform the action
+        self.action_space = spaces.Box(low=0, high=1, shape=(3,), dtype=np.float32)
 
     def _init_observation_space(self):
         self.wait_for_callbacks()
@@ -163,15 +162,17 @@ class ExplorationEnv(gym.Env):
 
 
     def scaled_action(self, action):
-        linear = action[0] * self.linear_max
-        angular = action[1] * self.angular_max
-        return [linear, angular]
+        linear = 2 * MAX_LINEAR_VELOCITY * action[0] - MAX_LINEAR_VELOCITY
+        angular = 2 * MAX_ANGULAR_VELOCITY * action[1] - MAX_ANGULAR_VELOCITY
+        action_time = (MAX_ACTION_TIME - MIN_ACTION_TIME) * action[2] + MIN_ACTION_TIME
+        return [linear, angular, action_time]
 
     def step(self, action):
         # self.ros_int.get_logger().info(f"[Exploration_env] New Action: {action}")
-        self.ros_int.cmd_vel_publish(self.scaled_action(action))
+        self.scaled_actions = self.scaled_action(action)
+        self.ros_int.cmd_vel_publish(self.scaled_action(action)[0:2])
 
-        self.wait_gazebo_time(1.0)
+        self.wait_gazebo_time(self.scaled_actions[2])
         
         done = self._get_done()
         observation = self._get_obs()
