@@ -55,8 +55,6 @@ class CustomLoggingCallback(BaseCallback):
         self.steps += 1
 
         # Retrieve the reward for this step
-        reward = self.locals['rewards'][0]  # 'rewards' is a list, use [0] for non-vectorized envs
-        self.episode_reward += reward
 
         # Access done and truncated from the locals
         done = self.locals['dones'][0]  # 'dones' is a list, use [0] for non-vectorized envs
@@ -64,6 +62,7 @@ class CustomLoggingCallback(BaseCallback):
 
         # rollout ends when either done or truncated is True
         if done or truncated:
+            self.episode_reward += self.locals['rewards'][0]  # 'rewards' is a list, use [0] for non-vectorized envs
             self.episodes += 1
             self.known_map_percentage = self.env.get_known_map_percentage()
 

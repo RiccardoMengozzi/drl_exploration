@@ -34,7 +34,7 @@ class ROSInterface(Node):
         self.tf_sub = self.create_subscription(TFMessage, '/tf', self.tf_callback, 10)
         self.gazreb_clock_sub = self.create_subscription(Clock, '/clock', self.gazebo_clock_callback, clock_qos_profile)
         self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
-        self.world_reset_client = self.create_client(Empty, '/reset_world')
+        self.sim_reset_client = self.create_client(Empty, '/reset_simulation')
 
     ###### SCAN TOPIC ######
 
@@ -205,15 +205,15 @@ class ROSInterface(Node):
         try:
             response = future.result()
             if response is not None:
-                self.get_logger().info('World reset successfully')
+                self.get_logger().info('Simulation reset successfully')
             else:
-                self.get_logger().error('Failed to reset World')
+                self.get_logger().error('Failed to reset Simulation')
         except Exception as e:
             self.get_logger().error(f'Service call failed: {str(e)}')
 
-    def reset_world(self):
-        print("Resetting world")
-        future = self.world_reset_client.call_async(Empty.Request())
+    def reset_simulation(self):
+        print("Resetting simulation")
+        future = self.sim_reset_client.call_async(Empty.Request())
         future.add_done_callback(self.reset_callback)
         return future
 
