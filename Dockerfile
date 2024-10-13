@@ -49,7 +49,7 @@ RUN pip install --no-cache-dir --upgrade pip \
 WORKDIR /ros_ws/src
 
 RUN git clone -b humble-devel https://github.com/ROBOTIS-GIT/turtlebot3_simulations.git
-RUN git clone https://github.com/RiccardoMengozzi/drl_exploration.git
+RUN git clone https://github.com/RiccardoMengozzi/drl_exploration.git #redo
 
 WORKDIR /ros_ws
 
