@@ -24,6 +24,7 @@ setup(
     entry_points={
         'console_scripts': [
             'drl_exploration = drl_exploration.main:main',
+            'spawn_tb3 = drl_exploration.spawn_tb3:main',
         ],
     },
 )
