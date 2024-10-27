@@ -3,38 +3,62 @@ import math
 import json
 import numpy as np
 import random
+import re
+import xml.etree.ElementTree as ET
 from ament_index_python.packages import get_package_share_directory
 
 
-def generate_centers(n_points, step_x=15, step_y=15):
-    # Calculate grid dimensions to be as close to square as possible
-    cols = math.ceil(math.sqrt(n_points))  # Number of columns
-    rows = math.ceil(n_points / cols)      # Calculate corresponding rows
+import os
+import json
+import math
 
+def generate_centers(n_points, env_models, models_properties_dir):
+    # Load the width properties for each environment model
+    x_widths = []
+    y_widths = []
+    for env_model in env_models:
+        properties_path = os.path.join(models_properties_dir, f'{env_model}_properties.json')
+        with open(properties_path, 'r') as file:
+            data = json.load(file)
+        x_widths.append(data['x_width'])
+        y_widths.append(data['y_width'])
+
+    # Get the maximum width and height to determine spacing for the grid
+    max_x_width = max(x_widths)
+    max_y_width = max(y_widths)
+    print(f"[INFO] [utils] x_widths: {x_widths}")
+    print(f"[INFO] [utils] y_widths: {y_widths}")
+
+    # Determine grid dimensions (rows and columns) for a near-square arrangement
+    cols = math.ceil(math.sqrt(n_points))
+    rows = math.ceil(n_points / cols)
+    print(f"[INFO] [utils] Grid dimensions - cols: {cols}, rows: {rows}")
+
+    # Generate center points for each environment
     points = []
-    
     for row in range(rows):
         for col in range(cols):
-            # Determine x and y positions
-            if row % 2 == 0:  # Even row: left to right
-                x = col * step_x
-            else:  # Odd row: right to left
-                x = (cols - 1 - col) * step_x
-            
-            y = row * step_y
+            if len(points) >= n_points:
+                break  # Stop if we have enough points
 
-            # Append the point to the list if within the total number of points
-            if len(points) < n_points:
-                points.append((x, y))
+            # Calculate x based on column and zigzag pattern for rows
+            x_offset = col * max_x_width if row % 2 == 0 else (cols - 1 - col) * max_x_width
+            y_offset = row * max_y_width
+            points.append((x_offset, y_offset))
     
-    return points
+    print(f"[INFO] [utils] Generated {n_points} points: {points[:n_points]}")
+    return points[:n_points]
 
 
 def create_multi_env_world(num_envs, 
-                           env_models, 
-                           env_model_step_x=15, 
-                           env_model_step_y=15, 
+                           env_models,  
                            mode='single_model'):
+    
+    package_name = 'drl_exploration'
+    package_share_directory = get_package_share_directory(package_name)
+    workspace_path = os.path.abspath(os.path.join(package_share_directory, '../../../..'))
+    models_properties_dir = os.path.join(workspace_path, 'src', package_name, 'extras', 'models_properties')
+
     
         # Define the beginning of the SDF world
     try:
@@ -85,231 +109,14 @@ def create_multi_env_world(num_envs,
 
     # Generate the big house blocks dynamically
         house_blocks = ""
-        centers = generate_centers(num_envs, step_x=env_model_step_x, step_y=env_model_step_y)
-
+        centers = generate_centers(num_envs, env_models, models_properties_dir=models_properties_dir)
         for i in range(num_envs):
             env_model = env_models[i]
             center = centers[i]
-            house_blocks += f'''
-
-
-    <!--<model name="aws_robomaker_warehouse_ShelfF_01_001">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_ShelfF_01</uri>
-            <pose>-5.795143 -0.956635 0 0 0 0</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name="aws_robomaker_warehouse_WallB_01_001">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_WallB_01</uri>
-            <pose>0.0 0.0 0 0 0 0</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name="aws_robomaker_warehouse_ShelfE_01_001">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_ShelfE_01</uri>
-            <pose>4.73156 0.57943 0 0 0 0</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name="aws_robomaker_warehouse_ShelfE_01_002">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_ShelfE_01</uri>
-            <pose>4.73156 -4.827049 0 0 0 0</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name="aws_robomaker_warehouse_ShelfE_01_003">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_ShelfE_01</uri>
-            <pose>4.73156 -8.6651 0 0 0 0</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name="aws_robomaker_warehouse_ShelfD_01_001">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_ShelfD_01</uri>
-            <pose>4.73156 -1.242668 0 0 0 0</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name="aws_robomaker_warehouse_ShelfD_01_002">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_ShelfD_01</uri>
-            <pose>4.73156 -3.038551 0 0 0 0</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name="aws_robomaker_warehouse_ShelfD_01_003">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_ShelfD_01</uri>
-            <pose>4.73156 -6.750542 0 0 0 0</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name="aws_robomaker_warehouse_GroundB_01_001">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_GroundB_01</uri>
-            <pose>0.0 0.0 -0.090092 0 0 0</pose>
-        </include>
-    <!--</model>-->
-
-
-    <!--<model name="aws_robomaker_warehouse_Bucket_01_020">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_Bucket_01</uri>
-            <pose>0.433449 9.631706 0 0 0 -1.563161</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name="aws_robomaker_warehouse_Bucket_01_021">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_Bucket_01</uri>
-            <pose>-1.8321 -6.3752 0 0 0 -1.563161</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name="aws_robomaker_warehouse_Bucket_01_022">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_Bucket_01</uri>
-            <pose>0.433449 8.59 0 0 0 -1.563161</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name='aws_robomaker_warehouse_ClutteringA_01_016'>-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_ClutteringA_01</uri>
-            <pose>5.708138 8.616844 -0.017477 0 0 0</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name='aws_robomaker_warehouse_ClutteringA_01_017'>-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_ClutteringA_01</uri>
-            <pose>3.408638 8.616844 -0.017477 0 0 0</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name='aws_robomaker_warehouse_ClutteringA_01_018'>-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_ClutteringA_01</uri>
-            <pose>-1.491287 5.222435 -0.017477 0 0 -1.583185</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name="aws_robomaker_warehouse_ClutteringC_01_027">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_ClutteringC_01</uri>
-            <pose>3.324959 3.822449 -0.012064 0 0 1.563871</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name="aws_robomaker_warehouse_ClutteringC_01_028">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_ClutteringC_01</uri>
-            <pose>5.54171 3.816475 -0.015663 0 0 -1.583191</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name="aws_robomaker_warehouse_ClutteringC_01_029">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_ClutteringC_01</uri>
-            <pose>5.384239 6.137154 0 0 0 3.150000</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name="aws_robomaker_warehouse_ClutteringC_01_030">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_ClutteringC_01</uri>
-            <pose>3.236 6.137154 0 0 0 3.150000</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name="aws_robomaker_warehouse_ClutteringC_01_031">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_ClutteringC_01</uri>
-            <pose>-1.573677 2.301994 -0.015663 0 0 -3.133191</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name="aws_robomaker_warehouse_ClutteringC_01_032">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_ClutteringC_01</uri>
-            <pose>-1.2196 9.407 -0.015663 0 0 1.563871</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name='aws_robomaker_warehouse_ClutteringD_01_005'>-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_ClutteringD_01</uri>
-            <pose>-1.634682 -7.811813 -0.319559 0 0 0</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name='aws_robomaker_warehouse_TrashCanC_01_002'>-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_TrashCanC_01</uri>
-            <pose>-1.592441 7.715420 0.190610 0 0 0</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name="aws_robomaker_warehouse_ClutteringB_01_003">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_ClutteringB_01</uri>
-            <pose>-5.10642 5.85081 -0.001234 0 0 3.138998</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name="aws_robomaker_warehouse_ClutteringB_01_004">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_ClutteringB_01</uri>
-            <pose>-2.090845 5.85081 -0.001234 0 0 3.138998</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name="aws_robomaker_warehouse_ClutteringB_01_005">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_ClutteringB_01</uri>
-            <pose>-0.304201 6.300127 -0.001234 0 0 3.138998</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name="aws_robomaker_warehouse_ClutteringB_01_006">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_ClutteringB_01</uri>
-            <pose>2.988739 6.300127 -0.001234 0 0 3.138998</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name="aws_robomaker_warehouse_ClutteringB_01_007">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_ClutteringB_01</uri>
-            <pose>5.500815 5.85081 -0.001234 0 0 3.138998</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name="aws_robomaker_warehouse_ClutteringB_01_008">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_ClutteringB_01</uri>
-            <pose>5.500815 2.533025 -0.001234 0 0 3.138998</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name="aws_robomaker_warehouse_ClutteringB_01_009">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_ClutteringB_01</uri>
-            <pose>3.272072 2.477133 -0.001234 0 0 3.138998</pose>
-        </include>
-    <!--</model>-->
-
-    <!--<model name="aws_robomaker_warehouse_ClutteringB_01_010">-->
-        <include>
-            <uri>model://aws_robomaker_warehouse_ClutteringB_01</uri>
-            <pose>0.978055 2.542203 -0.001234 0 0 3.138998</pose>
-        </include>
-    <!--</model>-->\n'''   
+            modify_name_and_pose(workspace_path, env_model, center[0], center[1], prefix=f'env_{i}_')
+            with open(os.path.join(workspace_path, 'src', package_name, 'extras', 'worlds_models_text', f'{env_model}.xml'), 'r') as file:
+                house_blocks += f'''
+                {file.read()} \n'''
 
             # house_blocks += f'''
             # <include>
@@ -325,10 +132,8 @@ def create_multi_env_world(num_envs,
 '''
 
         sdf_content = sdf_start + house_blocks + sdf_end
-        print("sdf_content: ", sdf_content)
-        package_name = 'drl_exploration'
-        package_share_directory = get_package_share_directory(package_name)
-        workspace_path = os.path.abspath(os.path.join(package_share_directory, '../../../..'))
+
+
 
         save_path = os.path.join(workspace_path, "src", package_name, 'worlds')
 
@@ -342,17 +147,17 @@ def create_multi_env_world(num_envs,
         with open(file_path, "w") as f:
             f.write(sdf_content)
 
-
-        print(f"[INFO] [world generator] File '{file_name}' generated successfully with {num_envs} environments.")   
+        
+        print(f"[INFO] [utils] File '{file_name}' generated successfully with {num_envs} environments.")   
         return file_name
     
     except Exception as e:
-        print(f"[ERROR] [world generator]: {e}")
+        print(f"[ERROR] [utils]: {e}")
         return None
     
 
-def get_random_pose(models_spawn_points_dir, env_model, env_center):
-    with open(os.path.join(models_spawn_points_dir, f'{env_model}_spawn_points.json'), 'r') as file:
+def get_random_pose(models_properties_dir, env_model, env_center):
+    with open(os.path.join(models_properties_dir, f'{env_model}_properties.json'), 'r') as file:
         data = json.load(file)
     # Access the starting coordinates
     x_start = data['x_start']
@@ -374,3 +179,105 @@ def get_random_pose(models_spawn_points_dir, env_model, env_center):
 
 
     return random_pose
+
+
+def remove_empty_lines(file_path):
+    # Read the contents of the file
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+
+    # Keep only non-empty lines
+    non_empty_lines = [line for line in lines if line.strip() != '']
+
+    # Write the cleaned lines back to the file
+    with open(file_path, 'w') as file:
+        file.writelines(non_empty_lines)
+
+
+def modify_name_and_pose(workspace_path, env_model, x_offset, y_offset, prefix):
+    try:
+        file_path = os.path.join(workspace_path, 'src', 'drl_exploration', 'extras', 'worlds_models_text', f'{env_model}.xml')
+        poses_file_path = os.path.join(workspace_path, 'src', 'drl_exploration', 'extras', 'worlds_models_poses', f'{env_model}_poses.json')
+
+        remove_empty_lines(file_path)
+
+        with open(file_path, 'r') as file:
+            content = file.read()
+        
+        # Remove existing <xml> and <sdf> tags using regex
+        content = re.sub(r'<xml>.*?</xml>', '', content, flags=re.DOTALL)
+        content = re.sub(r'<sdf.*?>', '', content, count=1)
+        content = re.sub(r'</sdf>', '', content)
+
+        # Add <sdf> tag at the beginning and </sdf> at the end
+        content = f'<sdf version="1.6">\n{content}\n</sdf>'
+
+        # Parse the SDF content
+        root = ET.fromstring(content)
+
+
+        # Load original poses from a temporary file if it exists
+        if os.path.exists(poses_file_path):
+            with open(poses_file_path, 'r') as temp:
+                original_poses = json.load(temp)
+        else:
+            original_poses = {}
+        # Iterate over each model and modify the name and pose
+        for model in root.findall('model'):
+            current_name = model.get('name')
+            
+            # Store the original pose if not already stored
+            pose = model.find('pose')
+
+            if pose is not None:
+                if current_name not in original_poses:
+                    original_poses[current_name] = pose.text
+
+                # Remove existing 'env_' followed by numbers from the name
+                current_name = re.sub(r'env_\d+_', '', current_name)
+                # Update the name with the new prefix
+                model.set('name', f"{prefix}{current_name}")
+
+                # Reset pose to original before modifying
+                pose.text = original_poses[current_name]  # Reset to original pose
+
+                x, y, z, roll, pitch, yaw = map(float, pose.text.split())
+                pose.text = f"{x + x_offset} {y + y_offset} {z} {roll} {pitch} {yaw}"
+            else: #try to find the <pose> tag inside the <include> tag of the <model> tag
+                include = model.find('include')
+                pose = include.find('pose')
+                if pose is not None:
+                    if current_name not in original_poses:
+                        original_poses[current_name] = pose.text
+
+                    # Remove existing 'env_' followed by numbers from the name
+                    current_name = re.sub(r'env_\d+_', '', current_name)
+                    # Update the name with the new prefix
+                    model.set('name', f"{prefix}{current_name}")
+
+                    # Reset pose to original before modifying
+                    pose.text = original_poses[current_name]
+
+                    x, y, z, roll, pitch, yaw = map(float, pose.text.split())
+                    pose.text = f"{x + x_offset} {y + y_offset} {z} {roll} {pitch} {yaw}"
+
+                else:
+                    raise Exception(f"Pose not found for model '{current_name}' inside {file_path}.")
+
+
+
+        # Convert back to string and remove <sdf> tags
+        updated_content = ET.tostring(root, encoding='unicode')
+        updated_content = re.sub(r'<sdf.*?>', '', updated_content, count=1)
+        updated_content = re.sub(r'</sdf>', '', updated_content)
+
+        # Write the modified content back to the file
+        with open(file_path, 'w') as file:
+            file.write(updated_content)
+
+        # Save original poses back to the temporary file
+        with open(poses_file_path, 'w') as temp:
+            json.dump(original_poses, temp)
+
+    except Exception as e:
+        print(f"[ERROR] [utils]: {e}")

@@ -26,7 +26,7 @@ def generate_launch_description():
     package_share_directory = get_package_share_directory(package_name)
     workspace_path = os.path.abspath(os.path.join(package_share_directory, '../../../..'))
     world_path = os.path.join(workspace_path, 'src', package_name, 'worlds')
-    models_spawn_points_dir = os.path.join(workspace_path, 'src', package_name, 'extras', 'models_spawn_points')
+    models_properties_dir = os.path.join(workspace_path, 'src', package_name, 'extras', 'models_properties')
     gazebo_ros_pkg_dir = get_package_share_directory('gazebo_ros')
 
     yaml_file_path = os.path.join(
@@ -46,8 +46,6 @@ def generate_launch_description():
     env_available_models = params['env']['available_models']
     env_model = params['env']['model']
     env_models = params['env']['models']
-    env_model_step_x = params['env']['model_step_x']
-    env_model_step_y = params['env']['model_step_y']
     random_pose = params['robot']['random_pose']
     robot_pos_x = params['robot']['pose']['x']
     robot_pos_y = params['robot']['pose']['y']
@@ -59,9 +57,8 @@ def generate_launch_description():
         print(f"[INFO] [multi_env_tb3.launch.py] Number of environments: {num_envs}")
         print(f"[INFO] [multi_env_tb3.launch.py] Mode: {mode}")
         print(f"[INFO] [multi_env_tb3.launch.py] Available models: {env_available_models}")
+        print(f"[INFO] [multi_env_tb3.launch.py] Model: {env_model}")
         print(f"[INFO] [multi_env_tb3.launch.py] Models: {env_models}")
-        print(f"[INFO] [multi_env_tb3.launch.py] Model step x: {env_model_step_x}")
-        print(f"[INFO] [multi_env_tb3.launch.py] Model step y: {env_model_step_y}")
         print(f"[INFO] [multi_env_tb3.launch.py] Random pose: {random_pose}")
         print(f"[INFO] [multi_env_tb3.launch.py] Robot pose x: {robot_pos_x}")
         print(f"[INFO] [multi_env_tb3.launch.py] Robot pose y: {robot_pos_y}")
@@ -69,7 +66,10 @@ def generate_launch_description():
         print("\n----------------------------------------------------\n")
 
 
-
+    if num_envs < 1:
+        raise ValueError("Number of environments should be greater than 0.")
+    if mode not in ['single_model', 'random_models', 'multiple_models']:
+        raise ValueError("Invalid mode. Please choose one of the following: 'single_model', 'random_models', 'multiple_models'.")
     if len(env_available_models) == 0:
         raise ValueError("No models available for spawning. Please add models to the 'available_models' list in the launch_params.yaml file.")
     if len(env_models) != num_envs and mode == 'multiple_models':
@@ -82,6 +82,7 @@ def generate_launch_description():
     if mode == 'random_models':
         env_models = []
         env_models = [random.choice(env_available_models) for _ in range(num_envs)]
+        print(f"[INFO] [multi_env_tb3.launch.py] Randomly selected models: {env_models}")
 
     # Just copy same model for all environments
     if mode == 'single_model':
@@ -90,8 +91,6 @@ def generate_launch_description():
 
     world_name = create_multi_env_world(num_envs, 
                                         env_models,
-                                        env_model_step_x,
-                                        env_model_step_y,
                                         mode=mode        
                                         )
 
@@ -116,12 +115,13 @@ def generate_launch_description():
 
     
     launch_actions = []
-    envs_centers = generate_centers(num_envs, step_x=env_model_step_x, step_y=env_model_step_y)
 
 
-    set_models_path = SetEnvironmentVariable(
-        'GAZEBO_MODEL_PATH',f'{workspace_path}/src/drl_exploration/models:{os.environ["GAZEBO_MODEL_PATH"]}'
-    )
+    # set_models_path = SetEnvironmentVariable(
+    #     'GAZEBO_MODEL_PATH',
+    #     f'{workspace_path}/src/drl_exploration/models/aws_models: \
+    #       {workspace_path}/src/drl_exploration/models/fuel_models:{os.environ["GAZEBO_MODEL_PATH"]}'
+    # )
 
     gz_server_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -142,18 +142,22 @@ def generate_launch_description():
             'verbose': str(gz_verbose)
         }.items()
     )
-    launch_actions.append(set_models_path)
+    # launch_actions.append(set_models_path)
     launch_actions.append(gz_server_cmd)
     launch_actions.append(gz_client_cmd)
 
+
+    envs_centers = generate_centers(num_envs, env_models, models_properties_dir=models_properties_dir)
     for i in range(num_envs):
         namespace = f'env_{i}'
         env_center = envs_centers[i]
         env_model = env_models[i]
         if random_pose:
-            robot_init_pose = get_random_pose(models_spawn_points_dir, env_model, env_center)
+            robot_init_pose = get_random_pose(models_properties_dir, env_model, env_center)
         else:
-            robot_init_pose = [robot_pos_x, robot_pos_y, robot_pos_yaw]
+            robot_init_pose = [robot_pos_x + env_center[0],
+                               robot_pos_y + env_center[1],
+                               robot_pos_yaw]
 
         robot_state_pub_cmd = Node(
             package='robot_state_publisher',
@@ -164,6 +168,10 @@ def generate_launch_description():
                 'use_sim_time': True,
                 'robot_description': robot_desc
             }],
+            remappings=[
+                ('/tf', f'/{namespace}/tf'),
+                ('/tf_static', f'/{namespace}/tf_static')
+                ],
         )   
 
         spawn_tb3_cmd = Node(
@@ -180,23 +188,60 @@ def generate_launch_description():
                 '-yaw', str(robot_init_pose[2]),
             ],
         )
-        # spawn_tb3_cmd = Node(
-        #     package='gazebo_ros',
-        #     executable='spawn_entity.py',
-        #     output='screen',
-        #     arguments=[
-        #         '-entity', f'{namespace}_tb3',
-        #         '-x', robot_pos_x + str((i * 15)),
-        #         '-y', robot_pos_y + str((i * 15)),
-        #         '-z', '0.01',
-        #         '-Y', robot_pos_yaw,
-        #         '-file', model_path,
-        #         '-robot_namespace', namespace
-        #     ]
-        # )
+
+        cartographer_cmd = Node(
+            package='cartographer_ros',
+            executable='cartographer_node',
+            namespace=namespace,
+            output='screen',
+            parameters=[{
+                'use_sim_time': True
+            }],
+            arguments=[
+                '-configuration_directory', os.path.join(get_package_share_directory('turtlebot3_cartographer'), 'config'),
+                '-configuration_basename', 'turtlebot3_lds_2d.lua',
+            ],
+            remappings=[
+                ('/tf', f'/{namespace}/tf'),
+                ('/tf_static', f'/{namespace}/tf_static')
+            ]
+        )
+
+
+
+        rviz_cmd = Node(
+            package='rviz2',
+            executable='rviz2',
+            namespace=namespace,
+            output='screen',
+            parameters=[{
+                'use_sim_time': True
+                }],
+            arguments=['-d', os.path.join(workspace_path, 'src', 'drl_exploration', 'rviz', 'config.rviz')],
+            remappings=[
+                ('/tf', f'/{namespace}/tf'),
+                ('/tf_static', f'/{namespace}/tf_static')
+            ]
+            )
+
+        occupancy_grid_cmd = Node(
+            package='cartographer_ros',
+            executable='cartographer_occupancy_grid_node',
+            namespace=namespace,
+            output='screen',
+            parameters=[{
+                'use_sim_time': True,
+                'resolution': '0.05',
+                'publish_period_sec': '1.0'
+            }],
+
+        )
+
 
         launch_actions.append(robot_state_pub_cmd)
         launch_actions.append(spawn_tb3_cmd)
-
+        launch_actions.append(cartographer_cmd)
+        launch_actions.append(rviz_cmd)
+        launch_actions.append(occupancy_grid_cmd)
         
     return LaunchDescription(launch_actions)

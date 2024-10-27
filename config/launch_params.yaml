@@ -4,18 +4,15 @@ gazebo:
   gui: True # set to false for better performances during training
   verbose: False
 env:
-  available_models: ['turtlebot3_bighouse', 'turtlebot3_world']
-  num_envs: 1
+  available_models: ['turtlebot3_bighouse', 'turtlebot3_world', 'small_warehouse', 'small_house', 'hospital']
+  num_envs: 2
   # single_model, multiple_models, random_models
   mode: 'single_model' 
   model: 'turtlebot3_bighouse' # for single_model
   models: ['turtlebot3_bighouse', # for multiple_models, random_models choose between all available worlds
-           'turtlebot3_bighouse',
-           'turtlebot3_bighouse',
-           'turtlebot3_bighouse',
-           'turtlebot3_bighouse'] 
-  model_step_x: 15 # distance between models in x axis
-  model_step_y: 15 # distance between models in y axis
+           'turtlebot3_world',
+           'small_warehouse',
+           'small_house']
 robot:
   random_pose: True
   pose:

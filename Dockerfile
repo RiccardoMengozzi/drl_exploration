@@ -1,6 +1,38 @@
 FROM osrf/ros:humble-desktop-full
 
 
+# # NOTES #
+# in generale puntare a modelli dentro models di turtlebot3, dentro cartella mdels di drl exploration 
+# e fuel_models:
+# per fare ciò, o esportare GAZEBO_MODEL_PATH in bashrc oppure mettere in launchfile
+# ===> MOLTO MEGLIO METTERE IN .BASHRC <===
+#
+#  for hospital world, must install respective requirements.txt:
+#     docopt>=0.6.2
+#     requests
+#     lxml
+
+#  and run this scrpt:
+#     #!/bin/bash
+#     python3 -m pip install -r requirements.txt
+#     python3 fuel_utility.py download \
+#     -m XRayMachine -m IVStand -m BloodPressureMonitor -m BPCart -m BMWCart \
+#     -m CGMClassic -m StorageRack -m Chair \
+#     -m InstrumentCart1 -m Scrubs -m PatientWheelChair \
+#     -m WhiteChipChair -m TrolleyBed -m SurgicalTrolley \
+#     -m PotatoChipChair -m VisitorKidSit -m FemaleVisitorSit \
+#     -m AdjTable -m MopCart3 -m MaleVisitorSit -m Drawer \
+#     -m OfficeChairBlack -m ElderLadyPatient -m ElderMalePatient \
+#     -m InstrumentCart2 -m MetalCabinet -m BedTable -m BedsideTable \
+#     -m AnesthesiaMachine -m TrolleyBedPatient -m Shower \
+#     -m SurgicalTrolleyMed -m StorageRackCovered -m KitchenSink \
+#     -m Toilet -m VendingMachine -m ParkingTrolleyMin -m PatientFSit \
+#     -m MaleVisitorOnPhone -m FemaleVisitor -m MalePatientBed \
+#     -m StorageRackCoverOpen -m ParkingTrolleyMax \
+#     -d fuel_models --verbose
+
+
+
 # Create a non-root user
 ARG USERNAME=ros
 ARG USER_UID=1000

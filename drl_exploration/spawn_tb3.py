@@ -53,6 +53,7 @@ def main():
     # We do this by adding `ROS argument entries` to the urdf file for
     # each plugin broadcasting a transform. These argument entries provide the
     # remapping rule, i.e. /tf -> /<robot_id>/tf
+
     tree = ET.parse(urdf_file_path)
     root = tree.getroot()
     imu_plugin = None
@@ -60,22 +61,44 @@ def main():
     for plugin in root.iter('plugin'):
         if 'turtlebot3_diff_drive' in plugin.attrib.values():
             diff_drive_plugin = plugin
-        # elif 'box_bot_imu_plugin' in plugin.attrib.values():
-        #     imu_plugin = plugin
+        elif 'turtlebot3_imu' in plugin.attrib.values():
+            imu_plugin = plugin
+        elif 'turtlebot3_joint_state' in plugin.attrib.values():
+            joint_state_plugin = plugin
 
     # We change the namespace to the robots corresponding one
-    tag_diff_drive_ros_params = diff_drive_plugin.find('ros')
-    tag_diff_drive_ns = ET.SubElement(tag_diff_drive_ros_params, 'namespace')
-    tag_diff_drive_ns.text = '/' + args.robot_namespace
-    ros_tf_remap = ET.SubElement(tag_diff_drive_ros_params, 'remapping')
-    ros_tf_remap.text = '/tf:=/' + args.robot_namespace + '/tf'
+    if diff_drive_plugin is not None:
+        tag_diff_drive_ros_params = diff_drive_plugin.find('ros')
+        tag_diff_drive_ns = ET.SubElement(tag_diff_drive_ros_params, 'namespace')
+        tag_diff_drive_ns.text = '/' + args.robot_namespace
+        tag_diff_drive_tf_remap = ET.SubElement(tag_diff_drive_ros_params, 'remapping')
+        tag_diff_drive_tf_remap.text = '/tf:=/' + args.robot_namespace + '/tf'
+        tag_diff_drive_tf_static_remap = ET.SubElement(tag_diff_drive_ros_params, 'remapping')
+        tag_diff_drive_tf_static_remap.text = '/tf_static:=/' + args.robot_namespace + '/tf_static'
+    else:
+        print("ERROR>>>>>>>>>>>>>>>>>>>>> DIFF DRIVE NOT FOUND")
 
-    # # if imu_plugin is not None:
-    # #     tag_imu_ros_params = imu_plugin.find('ros')
-    # #     tag_imu_ns = ET.SubElement(tag_imu_ros_params, 'namespace')
-    # #     tag_imu_ns.text = '/' + args.robot_namespace + '/imu'
-    # # else:
-    # #     print("ERROR>>>>>>>>>>>>>>>>>>>>> IMU NOT FOUND")
+    if joint_state_plugin is not None:
+        tag_joint_state_ros_params = joint_state_plugin.find('ros')
+        tag_joint_state_ns = ET.SubElement(tag_diff_drive_ros_params, 'namespace')
+        tag_joint_state_ns.text = '/' + args.robot_namespace
+        tag_joint_state_tf_remap = ET.SubElement(tag_joint_state_ros_params, 'remapping')
+        tag_joint_state_tf_remap.text = '/tf:=/' + args.robot_namespace + '/tf'
+        tag_joint_state_tf_static_remap = ET.SubElement(tag_joint_state_ros_params, 'remapping')
+        tag_joint_state_tf_static_remap.text = '/tf_static:=/' + args.robot_namespace + '/tf_static'
+    else:
+        print("ERROR>>>>>>>>>>>>>>>>>>>>> JOINT STATE NOT FOUND")
+
+    if imu_plugin is not None:
+        tag_imu_ros_params = imu_plugin.find('ros')
+        tag_imu_ns = ET.SubElement(tag_imu_ros_params, 'namespace')
+        tag_imu_ns.text = '/' + args.robot_namespace + '/imu'
+        tag_imu_tf_remap = ET.SubElement(tag_imu_ros_params, 'remapping')
+        tag_imu_tf_remap.text = '/tf:=/' + args.robot_namespace + '/tf'
+        tag_imu_tf_static_remap = ET.SubElement(tag_imu_ros_params, 'remapping')
+        tag_imu_tf_static_remap.text = '/tf_static:=/' + args.robot_namespace + '/tf_static'
+    else:
+        print("ERROR>>>>>>>>>>>>>>>>>>>>> IMU NOT FOUND")
 
 
     # Set data for request
