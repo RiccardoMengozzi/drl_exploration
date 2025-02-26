@@ -21,11 +21,11 @@ def load_yaml(file_path):
         return yaml.safe_load(file)
 
 
-def start_ros_interface(ros_int):
-    """Start a ROS interface in its own executor (single-threaded)."""
-    executor = SingleThreadedExecutor()
-    executor.add_node(ros_int)
-    executor.spin()  # Spin the executor to handle ROS communications
+# def start_ros_interface(ros_int):
+#     """Start a ROS interface in its own executor (single-threaded)."""
+#     executor = SingleThreadedExecutor()
+#     executor.add_node(ros_int)
+#     executor.spin()  # Spin the executor to handle ROS communications
 
 def create_env(index):
     """Create and return an environment along with its corresponding ROS interface."""
@@ -35,9 +35,9 @@ def create_env(index):
     # Create the ROS interface for this environment
     ros_int = ROSInterface(namespace)
     
-    # Create a separate thread to handle the ROS interface
-    ros_thread = threading.Thread(target=start_ros_interface, args=(ros_int,))
-    ros_thread.start() 
+    # # Create a separate thread to handle the ROS interface
+    # ros_thread = threading.Thread(target=start_ros_interface, args=(ros_int,))
+    # ros_thread.start() 
     
     # Create and return the environment
     env = ExplorationVecEnv(namespace, ros_interface=ros_int)
@@ -63,7 +63,7 @@ def main():
     env = SubprocVecEnv([lambda i=i: create_env(i) for i in range(num_envs)])
     
     # Initialize the PPO model with the parallel environments
-    model = PPO("MlpPolicy", env, verbose=1)
+    model = PPO("MultiInputPolicy", env, verbose=1)
     
     # Train the model for the specified number of timesteps
     model.learn(total_timesteps=10000)
